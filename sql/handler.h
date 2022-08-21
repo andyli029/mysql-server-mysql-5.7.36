@@ -302,6 +302,11 @@ enum enum_alter_inplace_result {
 */
 #define HA_CAN_INDEX_VIRTUAL_GENERATED_COLUMN (1LL << 47)
 
+/*
+  The handler supports non-KEY auto_increment column
+*/
+#define HA_NON_KEY_AUTO_INC           (1LL << 48) //TIANMU UPGRADE
+
 /* bits in index_flags(index_number) for what you can do with index */
 #define HA_READ_NEXT            1       /* TODO really use this flag */
 #define HA_READ_PREV            2       /* supports ::index_prev */
@@ -412,6 +417,7 @@ enum legacy_db_type
   DB_TYPE_TABLE_FUNCTION,
   DB_TYPE_MEMCACHE,
   DB_TYPE_FALCON,
+  DB_TYPE_TIANMU,
   DB_TYPE_MARIA,
   /** Performance schema engine. */
   DB_TYPE_PERFORMANCE_SCHEMA,
@@ -2194,6 +2200,19 @@ public:
     RANGE_SCAN_ASC,
     RANGE_SCAN_DESC
   };
+/*
+  virtual char *update_table_comment(const char * comment)
+  { return (char*) comment;}
+  virtual my_bool register_query_cache_table(THD *thd, char *table_key,
+                                             uint key_length,
+                                             qc_engine_callback
+                                             *engine_callback,
+                                             ulonglong *engine_data)
+  {
+    *engine_callback= 0;
+    return TRUE;
+  }
+*/
 private:
   /*
     Storage space for the end range value. Should only be accessed using
@@ -2806,6 +2825,15 @@ public:
     assert(FALSE);
     return HA_ERR_WRONG_COMMAND;
   }
+  /**
+    Tianmu update
+  */
+#if defined(TIANMU)
+  virtual bool explain_message(const Item *a_cond, String *buf)
+  {
+    return true;
+  }
+#endif
 protected:
   /**
      @brief

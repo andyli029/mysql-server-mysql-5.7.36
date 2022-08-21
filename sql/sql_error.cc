@@ -408,7 +408,9 @@ void Diagnostics_area::set_eof_status(THD *thd)
 {
   DBUG_ENTER("set_eof_status");
   /* Only allowed to report eof if has not yet reported an error */
-  assert(! is_set());
+  //TIANMU UPGRADE BEGIN
+  //assert(! is_set());
+  //END
   /*
     In production, refuse to overwrite an error or a custom response
     with an EOF packet.

@@ -1118,7 +1118,7 @@ public:
     @sa def_fields_set_during_insert.
   */
   MY_BITMAP     *fields_set_during_insert;
-
+  uint maybe_null;
   /*
    The ID of the query that opened and is using this table. Has different
    meanings depending on the table type.

@@ -119,5 +119,5 @@
   Note! Reserved for use in MySQL Cluster
 */
 #define OPTION_ALLOW_BATCH              (1ULL << 36) // THD, intern (slave)
-
+#define SELECT_ROUGHLY			(1ULL << 37)     // SELECT
 #endif  /* QUERY_OPTIONS_INCLUDED */

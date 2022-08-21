@@ -1636,14 +1636,24 @@ static Sys_var_enum Sys_event_scheduler(
        NO_MUTEX_GUARD, NOT_IN_BINLOG,
        ON_CHECK(event_scheduler_check), ON_UPDATE(event_scheduler_update));
 #endif
-
+//TIANMU UPGRADE BEGIN
+#if defined(TIANMU)
+static Sys_var_double Sys_expire_logs_days(
+       "expire_logs_days",
+       "If non-zero, binary logs will be purged after expire_logs_days "
+       "days; possible purges happen at startup and at binary log rotation",
+       GLOBAL_VAR(expire_logs_days),
+       CMD_LINE(REQUIRED_ARG), VALID_RANGE(0, 99), DEFAULT(0),
+       NO_MUTEX_GUARD, IN_BINLOG, ON_CHECK(0));
+#else
 static Sys_var_ulong Sys_expire_logs_days(
        "expire_logs_days",
        "If non-zero, binary logs will be purged after expire_logs_days "
        "days; possible purges happen at startup and at binary log rotation",
        GLOBAL_VAR(expire_logs_days),
        CMD_LINE(REQUIRED_ARG), VALID_RANGE(0, 99), DEFAULT(0), BLOCK_SIZE(1));
-
+#endif
+//END
 static Sys_var_mybool Sys_flush(
        "flush", "Flush MyISAM tables to disk between SQL commands",
        GLOBAL_VAR(myisam_flush),
@@ -4884,13 +4894,27 @@ static Sys_var_ulong Sys_default_week_format(
        "The default week format used by WEEK() functions",
        SESSION_VAR(default_week_format), CMD_LINE(REQUIRED_ARG),
        VALID_RANGE(0, 7), DEFAULT(0), BLOCK_SIZE(1));
-
+//TIANMU UPGRADE BEGIN
+/*
 static Sys_var_ulong Sys_group_concat_max_len(
        "group_concat_max_len",
        "The maximum length of the result of function  GROUP_CONCAT()",
        SESSION_VAR(group_concat_max_len), CMD_LINE(REQUIRED_ARG),
        VALID_RANGE(4, ULONG_MAX), DEFAULT(1024), BLOCK_SIZE(1));
-
+*/
+static bool upd_tianmu_group_concat_max_len(sys_var *self, THD *thd, enum_var_type type)
+{
+  if (type == OPT_SESSION)
+     tianmu_group_concat_max_len = thd->variables.group_concat_max_len;
+  return false;
+}
+static Sys_var_ulong Sys_group_concat_max_len(
+       "group_concat_max_len",
+       "The maximum length of the result of function  GROUP_CONCAT()",
+       SESSION_VAR(group_concat_max_len), CMD_LINE(REQUIRED_ARG),
+       VALID_RANGE(4, ULONG_MAX), DEFAULT(1024), BLOCK_SIZE(1),
+	   NO_MUTEX_GUARD, NOT_IN_BINLOG, ON_CHECK(0), ON_UPDATE(upd_tianmu_group_concat_max_len));
+//END
 static char *glob_hostname_ptr;
 static Sys_var_charptr Sys_hostname(
        "hostname", "Server host name",

@@ -201,6 +201,7 @@ extern LEX_CSTRING NULL_CSTR;
 
 extern "C" LEX_CSTRING thd_query_unsafe(MYSQL_THD thd);
 extern "C" size_t thd_query_safe(MYSQL_THD thd, char *buf, size_t buflen);
+extern "C" LEX_STRING * thd_query_string (MYSQL_THD thd);//TIANMU UPGRADE
 
 /**
   @class CSET_STRING
@@ -2211,9 +2212,10 @@ private:
   /**@}*/
   // NOTE: Ideally those two should be in Protocol,
   // but currently its design doesn't allow that.
-  NET     net;                          // client connection descriptor
+  //NET     net;                          // client connection descriptor
   String  packet;                       // dynamic buffer for network I/O
 public:
+  NET     net;                          // client connection descriptor
   void set_skip_readonly_check()
   {
     skip_readonly_check= true;
@@ -5081,6 +5083,10 @@ public:
   void send_error(uint errcode,const char *err);
   bool send_eof();
   void cleanup();
+  //TIANMU UPGRADE BEGIN
+  // FIXME: for tianmu. this is a kludge!
+  sql_exchange* get_sql_exchange() const { return exchange; }
+  //END
 };
 
 
@@ -5094,9 +5100,14 @@ public:
 
 
 class Query_result_export :public Query_result_to_file {
+  //TIANMU UPGRADE BEGIN
+protected: // FIXME: for tianmu
   size_t field_term_length;
   int field_sep_char,escape_char,line_sep_char;
   int field_term_char; // first char of FIELDS TERMINATED BY or MAX_INT
+  bool fixed_row_size;
+private:
+// TIANMU UPGRADE END
   /*
     The is_ambiguous_field_sep field is true if a value of the field_sep_char
     field is one of the 'n', 't', 'r' etc characters
@@ -5115,7 +5126,6 @@ class Query_result_export :public Query_result_to_file {
     (see the NUMERIC_CHARS constant value).
   */
   bool is_unsafe_field_sep;
-  bool fixed_row_size;
   const CHARSET_INFO *write_cs; // output charset
 public:
   Query_result_export(sql_exchange *ex) : Query_result_to_file(ex) {}

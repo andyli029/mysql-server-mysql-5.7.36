@@ -8961,4 +8961,100 @@ bool Item_func_version::itemize(Parse_context *pc, Item **res)
   pc->thd->lex->set_stmt_unsafe(LEX::BINLOG_STMT_UNSAFE_SYSTEM_FUNCTION);
   return false;
 }
+#ifdef TIANMU
+std::set<std::string> Item_func_multivalue_find::sepstr(const std::string &sStr, const std::string &sSep, bool withEmpty)
+{
+    std::set<std::string> setResult;
 
+    std::string::size_type pos = 0;
+    std::string::size_type pos1 = 0;
+
+    while(true)
+    {
+        std::string s;
+        pos1 = sStr.find_first_of(sSep, pos);
+        if(pos1 == std::string::npos)
+        {
+            if(pos + 1 <= sStr.length())
+            {
+                s = sStr.substr(pos);
+            }
+        }
+        else if(pos1 == pos)
+        {
+            s = "";
+        }
+        else
+        {
+            s = sStr.substr(pos, pos1 - pos);
+            pos = pos1;
+        }
+
+        if(withEmpty)
+        {
+            setResult.insert(s);
+        }
+        else
+        {
+            if(!s.empty())
+            {
+                setResult.insert(s);
+            }
+        }
+
+        if(pos1 == std::string::npos)
+        {
+            break;
+        }
+
+        pos++;
+    }
+
+    return setResult;
+}
+
+longlong Item_func_multivalue_find::val_int()
+{
+  if (args[0]->result_type() != STRING_RESULT || args[1]->result_type() != STRING_RESULT || args[2]->result_type() != STRING_RESULT)
+  {
+    null_value=1;
+    return 0;
+  }
+  if((null_value= args[1]->null_value) || (null_value= args[2]->null_value))
+  {
+    null_value=1;
+    return 0;
+  }
+
+  String *arg0 = args[0]->val_str(&value0);
+  String *arg1 = args[1]->val_str(&value1);
+  String *arg2 = args[2]->val_str(&value2);
+  if (!arg0 || !arg1 || !arg2)
+  {
+    return 0;
+  }
+  
+  std::string columnValue(arg0->ptr(), arg0->length());
+  std::string findValue(arg1->ptr(), arg1->length());
+  std::string splitStr(arg2->ptr(), arg2->length());
+
+  if(columnValue.length() < findValue.length())
+  {
+    null_value=1;
+    return 0;
+  }
+
+  null_value=0;
+  std::set<std::string> setColumnValue = sepstr(columnValue, splitStr, false);
+  std::set<std::string> setFindStr = sepstr(findValue, splitStr, false);
+  
+  for(std::set<std::string>::const_iterator iter = setColumnValue.begin(); iter != setColumnValue.end(); ++iter)
+  {
+    if(setFindStr.find(*iter) != setFindStr.end())
+    {
+      return 1;
+    }
+  }
+  return 0;
+}
+#endif

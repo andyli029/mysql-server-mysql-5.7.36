@@ -3821,6 +3821,18 @@ void Item_func_group_concat::print(String *str, enum_query_type query_type)
   str->append(STRING_WITH_LEN("\')"));
 }
 
+ORDER::enum_order Item_func_group_concat::direction()
+{
+  if (arg_count_order)
+  {
+    for (uint i= 0 ; i < arg_count_order ; i++)
+    {
+        //just return the 1st arg order as Tianmu only support one
+        return order_array[i].direction;
+    }
+  }
+  return ORDER::ORDER_NOT_RELEVANT;
+}
 
 Item_func_group_concat::~Item_func_group_concat()
 {

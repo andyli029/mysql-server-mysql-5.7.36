@@ -51,6 +51,8 @@
 
 #include <algorithm>
 
+#include "../storage/tianmu/handler/ha_rcengine.h" // tianmu code
+
 using std::min;
 using std::max;
 
@@ -214,6 +216,14 @@ int mysql_load(THD *thd,sql_exchange *ex,TABLE_LIST *table_list,
   const char *tdb= thd->db().str ? thd->db().str : db; //Result is never null
   ulong skip_lines= ex->skip_lines;
   DBUG_ENTER("mysql_load");
+  if (mysql_bin_log.is_open())
+  {
+    lf_info.thd = thd;
+    lf_info.wrote_create_file = 0;
+    lf_info.last_pos_in_file = HA_POS_ERROR;
+    lf_info.log_delayed= true;
+  }
+  //END
 
   /*
     Bug #34283
@@ -298,6 +308,11 @@ int mysql_load(THD *thd,sql_exchange *ex,TABLE_LIST *table_list,
     my_error(ER_UPDATE_TABLE_USED, MYF(0), table_list->table_name);
     DBUG_RETURN(TRUE);
   }
+  // TIANMU UPGRADE BEGIN
+  if (!Tianmu::dbhandler::tianmu_load(thd, ex, table_list, (void*) &lf_info)) {
+    DBUG_RETURN(FALSE);
+  }
+  //END
 
   TABLE *const table= insert_table_ref->table;
 

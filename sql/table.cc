@@ -2631,11 +2631,20 @@ static int open_binary_frm(THD *thd, TABLE_SHARE *share, uchar *head,
   if (share->found_next_number_field)
   {
     Field *reg_field= *share->found_next_number_field;
+    /*
     if ((int) (share->next_number_index= (uint)
 	       find_ref_key(share->key_info, share->keys,
                             share->default_values, reg_field,
 			    &share->next_number_key_offset,
                             &share->next_number_keypart)) < 0)
+    */
+    //TIANMU UPGRADE
+     share->next_number_index= (uint) find_ref_key(share->key_info,
+            share->keys, share->default_values,
+            reg_field, &share->next_number_key_offset,
+            &share->next_number_keypart);
+    if ((int) (share->next_number_index) < 0 && !(handler_file->ha_table_flags() & HA_NON_KEY_AUTO_INC))
+    //END
     {
       /* Wrong field definition */
       error= 4;
@@ -3918,7 +3927,7 @@ static uint find_field(Field **fields, uchar *record, uint start, uint length)
 
 	/* Check that the integer is in the internal */
 
-int set_zone(int nr, int min_zone, int max_zone)
+int set_zone(register int nr, int min_zone, int max_zone)//TIANMU UPGRADE 
 {
   if (nr<=min_zone)
     return (min_zone);
@@ -3929,7 +3938,7 @@ int set_zone(int nr, int min_zone, int max_zone)
 
 	/* Adjust number to next larger disk buffer */
 
-ulong next_io_size(ulong pos)
+ulong next_io_size(register ulong pos)//TIANMU UPGRADE
 {
   ulong offset;
   if ((offset= pos & (IO_SIZE-1)))
@@ -3995,7 +4004,7 @@ File create_frm(THD *thd, const char *name, const char *db,
                 const char *table, uint reclength, uchar *fileinfo,
   		HA_CREATE_INFO *create_info, uint keys, KEY *key_info)
 {
-  File file;
+  register File file; //TIANMU UPGRADE
   ulong length;
   uchar fill[IO_SIZE];
   int create_flags= O_RDWR | O_TRUNC;

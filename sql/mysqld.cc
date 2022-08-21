@@ -21,6 +21,7 @@
    Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA */
 
 #include "mysqld.h"
+#include "build_info.h"
 #include "mysqld_daemon.h"
 
 #include <vector>
@@ -496,6 +497,7 @@ ulong binlog_cache_use= 0, binlog_cache_disk_use= 0;
 ulong binlog_stmt_cache_use= 0, binlog_stmt_cache_disk_use= 0;
 ulong max_connections, max_connect_errors;
 ulong rpl_stop_slave_timeout= LONG_TIMEOUT;
+ulong tianmu_group_concat_max_len = 1024;
 my_bool log_bin_use_v1_row_events= 0;
 bool thread_cache_size_specified= false;
 bool host_cache_size_specified= false;
@@ -523,7 +525,11 @@ ulong current_pid;
 uint sync_binlog_period= 0, sync_relaylog_period= 0,
      sync_relayloginfo_period= 0, sync_masterinfo_period= 0,
      opt_mts_checkpoint_period, opt_mts_checkpoint_group;
+#if defined(TIANMU)
+double expire_logs_days = 0;
+#else
 ulong expire_logs_days = 0;
+#endif
 /**
   Soft upper limit for number of sp_head objects that can be stored
   in the sp_cache for one connection.
@@ -857,7 +863,13 @@ static char shutdown_event_name[40];
 static   NTService  Service;        ///< Service object for WinNT
 #endif /* EMBEDDED_LIBRARY */
 #endif /* _WIN32 */
-
+//TIANMU UPGRADE BEGIN
+#ifndef _WIN32
+#if !defined(EMBEDDED_LIBRARY)
+static mysql_mutex_t LOCK_handler_count;
+#endif
+#endif
+//END
 #ifndef EMBEDDED_LIBRARY
 bool mysqld_embedded=0;
 #else
@@ -916,7 +928,31 @@ static void delete_pid_file(myf flags);
 /****************************************************************************
 ** Code to end mysqld
 ****************************************************************************/
+//TIANMU UPGRADE BEGIN
+static std::set<CALLBACK_KILLTHREAD> _threadcb;
 
+int registeClose(CALLBACK_KILLTHREAD cb){
+    mysql_mutex_lock(&LOCK_handler_count);
+    _threadcb.insert(cb);
+    mysql_mutex_unlock(&LOCK_handler_count);
+    return 0;
+}
+
+int deregisteClose(CALLBACK_KILLTHREAD cb){
+    mysql_mutex_lock(&LOCK_handler_count);
+    _threadcb.erase(cb);
+    mysql_mutex_unlock(&LOCK_handler_count);
+    return 0;
+}
+
+int closebycallback(){
+    for(auto& iter : _threadcb){
+        iter();
+    }
+    _threadcb.clear();
+    return 0;
+}
+//END
 /**
   This class implements callback function used by close_connections()
   to set KILL_CONNECTION flag on all thds in thd list.
@@ -1035,6 +1071,10 @@ static void close_connections(void)
   if (shared_mem_acceptor != NULL)
     shared_mem_acceptor->close_listener();
 #endif
+
+
+    //close those specific threads that do not support alarm
+    closebycallback();
 
   /*
     First signal all threads that it's time to die
@@ -1488,6 +1528,7 @@ static void set_ports()
 
 #if MYSQL_PORT_DEFAULT == 0
     struct  servent *serv_ptr;
+    /* TODO: should we create a tianmu entry in /etc/services? */
     if ((serv_ptr= getservbyname("mysql", "tcp")))
       mysqld_port= ntohs((u_short) serv_ptr->s_port); /* purecov: inspected */
 #endif
@@ -1558,13 +1599,6 @@ err:
   sql_print_error("Fatal error: Can't change to run as user '%s' ;  Please check that the user exists!\n",user);
   unireg_abort(MYSQLD_ABORT_EXIT);
 
-#ifdef PR_SET_DUMPABLE
-  if (test_flags & TEST_CORE_ON_SIGNAL)
-  {
-    /* inform kernel that process is dumpable */
-    (void) prctl(PR_SET_DUMPABLE, 1);
-  }
-#endif
 
   return NULL;
 }
@@ -2778,12 +2812,11 @@ int init_common_variables()
     (except in the embedded server, where the default continues to
     be MyISAM)
   */
-#ifdef EMBEDDED_LIBRARY
-  default_storage_engine= const_cast<char *>("MyISAM");
-#else
-  default_storage_engine= const_cast<char *>("InnoDB");
-#endif
-  default_tmp_storage_engine= default_storage_engine;
+
+  default_storage_engine= const_cast<char *>("tianmu");
+
+  default_tmp_storage_engine= const_cast<char *>("InnoDB");
+
 
 
   /*
@@ -4315,6 +4348,16 @@ a file name for --log-bin-index option", opt_binlog_index_name);
 #endif
     locked_in_memory=0;
 
+//TIANMU UPGRADE BEGIN
+#ifdef PR_SET_DUMPABLE
+  if (test_flags & TEST_CORE_ON_SIGNAL)
+  {
+    /* inform kernel that process is dumpable */
+    (void) prctl(PR_SET_DUMPABLE, 1);
+  }
+#endif
+// END
+
   /* Initialize the optimizer cost module */
   init_optimizer_cost_module(true);
   ft_init_stopwords();
@@ -4921,7 +4964,13 @@ int mysqld_main(int argc, char **argv)
     mysql_bin_log.update_binlog_end_pos();
 
 #ifdef HAVE_REPLICATION
+
+//TIANMU UPGRADE
+#if defined(TIANMU)
+    if (opt_bin_log && (expire_logs_days >= 0.1))
+#else
     if (opt_bin_log && expire_logs_days)
+#endif
     {
       time_t purge_time= server_start_time - expire_logs_days * 24 * 60 * 60;
       DBUG_EXECUTE_IF("expire_logs_always_at_start",
@@ -5702,7 +5751,15 @@ struct my_option my_long_early_options[]=
    "Port number to use for connection.",
    &opt_keyring_migration_port, &opt_keyring_migration_port,
    0, GET_ULONG, REQUIRED_ARG, 0, 0, 0, 0, 0, 0},
+//TIANMU UPGRADE BEGIN
+#if defined(TIANMU)
+  {"tianmu-data-dir", OPT_TIANMU_DATA_DIRECTORY,
+   "Specifies a directory to add to the tianmu data storage.",
+   0, 0, 0, GET_STR, REQUIRED_ARG, 0, 0, 0, 0, 0, 0},
+#endif
+//END
   { 0, 0, 0, 0, 0, 0, GET_NO_ARG, NO_ARG, 0, 0, 0, 0, 0, 0 }
+
 };
 
 /**
@@ -6984,6 +7041,17 @@ static void print_version(void)
   printf("%s  Ver %s for %s on %s (%s)\n",my_progname,
    server_version,SYSTEM_TYPE,MACHINE_TYPE, MYSQL_COMPILATION_COMMENT);
 }
+//TIANMU UPGRADE BEGIN
+static void print_build_info(void)
+{
+  printf("build information as follow: \n");
+  printf("\tRepository address: %s\n", STONEDB_REPO_ADDR);
+  printf("\tBranch name: %s\n", STONEDB_BRANCH_NAME);
+  printf("\tLast commit ID: %s\n", STONEDB_COMMIT_ID);
+  printf("\tLast commit time: %s\n", STONEDB_COMMIT_TIME);
+  printf("\tBuild time: %s\n", STONEDB_BUILD_TIME);
+}
+//END
 
 /** Compares two options' names, treats - and _ the same */
 static bool operator<(const my_option &a, const my_option &b)
@@ -7045,7 +7113,7 @@ static void usage(void)
   if (!default_collation_name)
     default_collation_name= (char*) default_charset_info->name;
   print_version();
-  puts(ORACLE_WELCOME_COPYRIGHT_NOTICE("2000"));
+  puts(ORACLE_WELCOME_COPYRIGHT_NOTICE(COPYRIGHT_NOTICE_STONEDB_BEGIN_YEAR));
   puts("Starts the MySQL database server.\n");
   printf("Usage: %s [OPTIONS]\n", my_progname);
   if (!opt_verbose)
@@ -7340,6 +7408,9 @@ mysqld_get_one_option(int optid,
 #ifndef EMBEDDED_LIBRARY
   case 'V':
     print_version();
+    //TIANMU UPGRADE BEGIN
+    print_build_info();
+    //END
     exit(MYSQLD_SUCCESS_EXIT);
 #endif /*EMBEDDED_LIBRARY*/
   case 'W':
@@ -7682,6 +7753,20 @@ pfs_error:
   case OPT_SHOW_OLD_TEMPORALS:
     push_deprecated_warn_no_replacement(NULL, "show_old_temporals");
     break;
+//TIANMU UPGRADE BEGIN
+#if defined(TIANMU)
+  case OPT_TIANMU_DATA_DIRECTORY:
+    extern int tianmu_push_data_dir(const char*);
+    if (tianmu_push_data_dir(argument))
+    {
+      sql_print_error("Can't start server: "
+                      "cannot process --tianmu-data-dir=%.*s",
+                      FN_REFLEN, argument);
+      return 1;
+    }
+    break;
+#endif
+//END
   case OPT_KEYRING_MIGRATION_PASSWORD:
     if (argument)
     {

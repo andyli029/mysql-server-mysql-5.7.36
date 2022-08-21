@@ -33,6 +33,10 @@ class PT_item_list;
 
 /* Function items used by mysql */
 
+#ifdef TIANMU
+#include <set>
+#endif 
+
 extern void reject_geometry_args(uint arg_count, Item **args,
                                  Item_result_field *me);
 void unsupported_json_comparison(size_t arg_count, Item **args,
@@ -2887,4 +2891,16 @@ Item_field *get_gc_for_expr(Item_func **func, Field *fld, Item_result type);
 
 extern bool volatile  mqh_used;
 
+#ifdef TIANMU
+class Item_func_multivalue_find :public Item_int_func
+{
+  String value0,value1,value2;
+public:
+  Item_func_multivalue_find(Item* a, Item* b, Item* c)  : Item_int_func(a, b, c) {}
+  longlong val_int();
+  const char *func_name() const { return "multivalue_find"; }
+private:
+  static inline std::set<std::string> sepstr(const std::string &sStr, const std::string &sSep, bool withEmpty);
+};
+#endif
 #endif /* ITEM_FUNC_INCLUDED */

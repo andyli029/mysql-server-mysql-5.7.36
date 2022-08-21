@@ -394,7 +394,13 @@ public:
   {
     init_aggregator();
   }
-
+  //TIANMU UPGRADE
+  Item_sum() :next(NULL), quick_group(1), arg_count(0), forced_const(FALSE)
+  {
+	  mark_as_sum_func();
+	  init_aggregator();
+  }
+  //END
 
   Item_sum(Item *a) :next(NULL), quick_group(1), arg_count(1), args(tmp_args),
    forced_const(FALSE)
@@ -712,6 +718,9 @@ public:
   Item_sum_num(const POS &pos, PT_item_list *list) 
     :Item_sum(pos, list), is_evaluated(FALSE)
   {}
+  //TIANMU UPGRADE
+  Item_sum_num() :Item_sum(),is_evaluated(FALSE) {}
+  //END
 
   Item_sum_num(THD *thd, Item_sum_num *item) 
     :Item_sum(thd, item),is_evaluated(item->is_evaluated) {}
@@ -1579,6 +1588,7 @@ public:
     else
       return MYSQL_TYPE_VARCHAR;
   }
+  ORDER::enum_order direction();                             
   void clear();
   bool add();
   void reset_field() { assert(0); }        // not used
@@ -1614,6 +1624,8 @@ public:
     return get_time_from_string(ltime);
   }
   String* val_str(String* str);
+  String* get_separator() { return separator; }
+  bool get_distinct() { return distinct; }
   Item *copy_or_same(THD* thd);
   void no_rows_in_result() {}
   virtual void print(String *str, enum_query_type query_type);

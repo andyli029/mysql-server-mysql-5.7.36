@@ -7606,7 +7606,11 @@ int MYSQL_BIN_LOG::rotate(bool force_rotate, bool* check_purge)
 void MYSQL_BIN_LOG::purge()
 {
 #ifdef HAVE_REPLICATION
+#if defined(TIANMU)
+  if (expire_logs_days >= 0.1)
+#else
   if (expire_logs_days)
+#endif
   {
     DEBUG_SYNC(current_thd, "at_purge_logs_before_date");
     time_t purge_time= my_time(0) - expire_logs_days*24*60*60;

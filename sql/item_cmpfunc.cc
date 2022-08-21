@@ -529,6 +529,9 @@ static bool convert_constant_item(THD *thd, Item_field *field_item,
       !((*item)->field_type() == field_item->field_type() &&
         (*item)->basic_const_item()))
   {
+    /* FIXME: Tianmu integration disables subquery execution in this phase */
+    if ((*item)->type()==Item::SUBSELECT_ITEM)
+	    return 0;
     TABLE *table= field->table;
     sql_mode_t orig_sql_mode= thd->variables.sql_mode;
     enum_check_fields orig_count_cuted_fields= thd->count_cuted_fields;

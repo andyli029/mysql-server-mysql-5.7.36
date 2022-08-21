@@ -194,7 +194,11 @@ extern my_bool locked_in_memory;
 extern bool opt_using_transactions;
 extern ulong max_long_data_size;
 extern ulong current_pid;
+#if defined(TIANMU)
+extern double expire_logs_days;
+#else
 extern ulong expire_logs_days;
+#endif
 extern my_bool relay_log_recovery;
 extern uint sync_binlog_period, sync_relaylog_period,
             sync_relayloginfo_period, sync_masterinfo_period,
@@ -237,6 +241,7 @@ extern ulong aborted_threads;
 extern ulong delayed_insert_timeout;
 extern ulong delayed_insert_limit, delayed_queue_size;
 extern ulong delayed_insert_threads, delayed_insert_writes;
+extern ulong tianmu_group_concat_max_len;
 extern ulong delayed_rows_in_use,delayed_insert_errors;
 extern Atomic_int32 slave_open_temp_tables;
 extern ulong query_cache_size, query_cache_min_res_unit;
@@ -947,7 +952,10 @@ enum options_mysqld
   OPT_KEYRING_MIGRATION_PASSWORD,
   OPT_KEYRING_MIGRATION_SOCKET,
   OPT_KEYRING_MIGRATION_PORT,
-  OPT_NAMED_PIPE_FULL_ACCESS_GROUP
+  OPT_NAMED_PIPE_FULL_ACCESS_GROUP,
+#if defined(TIANMU)
+  OPT_TIANMU_DATA_DIRECTORY,
+#endif
 };
 
 
@@ -1024,5 +1032,9 @@ static inline THD *_current_thd(void)
 #ifdef _WIN32
 bool update_named_pipe_full_access_group(const char *new_group_name);
 #endif
+
+typedef int (*CALLBACK_KILLTHREAD)();
+extern int registeClose(CALLBACK_KILLTHREAD cb);
+extern int deregisteClose(CALLBACK_KILLTHREAD cb);
 
 #endif /* MYSQLD_INCLUDED */

@@ -183,6 +183,7 @@ public:
   virtual bool clean_up_after_removal(uchar *arg);
 
   const char *func_name() const { assert(0); return "subselect"; }
+  st_select_lex_unit* get_unit() const { return unit; };
 
   friend class Query_result_interceptor;
   friend class Item_in_optimizer;

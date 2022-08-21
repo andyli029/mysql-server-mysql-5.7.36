@@ -1016,6 +1016,11 @@ bool Explain_table_base::explain_extra_common(int quick_type,
         StringBuffer<64> buff(cs);
         if (can_print_clauses())
           ((Item *)pushed_cond)->print(&buff, cond_print_flags);
+        //TIANMU UPGRADE BEGIN
+        #if defined(TIANMU)
+        table->file->explain_message(tab->condition_optim(), &buff);
+        #endif
+        //END
         if (push_extra(ET_USING_WHERE_WITH_PUSHED_CONDITION, buff))
           return true;
       }

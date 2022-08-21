@@ -135,7 +135,7 @@ static uint32 get_key_length_tmp_table(Item *item);
   @retval 1 Error, error code saved in member JOIN::error.
 */
 int
-JOIN::optimize()
+JOIN::optimize(unsigned char part) //TIANMU UPGRADE
 {
   uint no_jbuf_after= UINT_MAX;
 
@@ -143,10 +143,27 @@ JOIN::optimize()
   assert(select_lex->leaf_table_count == 0 ||
          thd->lex->is_query_tables_locked() ||
          select_lex == unit->fake_select_lex);
-  assert(tables == 0 &&
-         primary_tables == 0 &&
-         tables_list == (TABLE_LIST*)1);
-
+  //assert(tables == 0 &&
+  //       primary_tables == 0 &&
+  //       tables_list == (TABLE_LIST*)1);
+  //TIANMU UPGRADE BEGIN
+  /*
+  Two more values of part were introduced part=3 and part=4. The main reason is to break optimization in sense of part=2 in point
+  where all transformations of LOJ conditions are finished. The optimization is continued in case we switch to MySQL.
+  The case was wrong result in "select * from t1 left join t2 on a1=b1 and b1=3 where a1=1;". That was due to optimization
+  of ON condition "a1=b1 and b1=3" into "a1=b1 and b1=1" which after part=2 would be transformed to FALSE. Part=3 does this transformation.
+  However, it has to be stopped at some point (compared to part=2) to avoid rest of optimizations, e.g., creation of temporary tables. (P.S.)
+  */
+  //const bool first_optimization= select_lex->first_cond_optimization;
+  Opt_trace_context * const trace= &thd->opt_trace;
+  Opt_trace_object trace_wrapper(trace);
+  Opt_trace_object trace_optimize(trace, "join_optimization");
+  trace_optimize.add_select_number(select_lex->select_number);
+  Opt_trace_array trace_steps(trace, "steps");
+  if(part != 4) {
+    if (part==0 || part==1)
+    {
+  //END
   // to prevent double initialization on EXPLAIN
   if (optimized)
     DBUG_RETURN(0);
@@ -172,13 +189,15 @@ JOIN::optimize()
     if (select_lex->apply_local_transforms(thd, false))
       DBUG_RETURN(error= 1);
   }
-
+  //TIANMU UPGRADE
+  /*
   Opt_trace_context * const trace= &thd->opt_trace;
   Opt_trace_object trace_wrapper(trace);
   Opt_trace_object trace_optimize(trace, "join_optimization");
   trace_optimize.add_select_number(select_lex->select_number);
   Opt_trace_array trace_steps(trace, "steps");
-
+  */
+  //END
   count_field_types(select_lex, &tmp_table_param, all_fields, false, false);
 
   assert(tmp_table_param.sum_func_count == 0 ||
@@ -238,11 +257,11 @@ JOIN::optimize()
     best_rowcount= 0;
     goto setup_subq_exit;
   }
-
+ }//TIANMU UPGRADE END part=0||part=1
   if (where_cond || select_lex->outer_join)
   {
     if (optimize_cond(thd, &where_cond, &cond_equal,
-                      &select_lex->top_join_list, &select_lex->cond_value))
+                      &select_lex->top_join_list, &select_lex->cond_value,part))//TIANMU UPGRADE
     {
       error= 1;
       DBUG_PRINT("error",("Error from optimize_cond"));
@@ -258,7 +277,7 @@ JOIN::optimize()
   if (having_cond)
   {
     if (optimize_cond(thd, &having_cond, &cond_equal, NULL,
-                      &select_lex->having_value))
+                      &select_lex->having_value, part))//TIANMU UPGRADE
     {
       error= 1;
       DBUG_PRINT("error",("Error from optimize_cond"));
@@ -271,7 +290,13 @@ JOIN::optimize()
       goto setup_subq_exit;
     }
   }
-
+   //TIANMU UPGRADE 
+  if (part == 1)
+  {
+	error= 0;
+	DBUG_RETURN(0);
+  }
+   //END
   if (select_lex->partitioned_table_count && prune_table_partitions())
   {
     error= 1;
@@ -304,7 +329,7 @@ JOIN::optimize()
       if (res == HA_ERR_KEY_NOT_FOUND)
       {
         DBUG_PRINT("info",("No matching min/max row"));
-	zero_result_cause= "No matching min/max row";
+	    zero_result_cause= "No matching min/max row";
         goto setup_subq_exit;
       }
       if (res > 1)
@@ -411,7 +436,7 @@ JOIN::optimize()
   }
 
   if (const_tables && !thd->locked_tables_mode &&
-      !(select_lex->active_options() & SELECT_NO_UNLOCK))
+      !(select_lex->active_options() & SELECT_NO_UNLOCK )&& part!=3) //TIANMU UPGRADE
   {
     TABLE *ct[MAX_TABLES];
     for (uint i= 0; i < const_tables; i++)
@@ -468,7 +493,13 @@ JOIN::optimize()
       tab->join_cond()->update_used_tables();
     }
   }
-
+  //TIANMU UPGRADE BEGIN
+  // this is end of part=3 and beginning of part=4
+  if(part == 3) {
+     DBUG_RETURN(0);	// error == 0
+   }
+  //END
+}// end of if(part!=4)
   if (init_ref_access())
   {
     error= 1;
@@ -534,7 +565,7 @@ JOIN::optimize()
   {
     having_cond->update_used_tables();
     if (remove_eq_conds(thd, having_cond, &having_cond,
-                        &select_lex->having_value))
+                        &select_lex->having_value, part))
     {
       error= 1;
       DBUG_PRINT("error",("Error from remove_eq_conds"));
@@ -5218,8 +5249,11 @@ bool JOIN::init_planner_arrays()
   // Up to one extra slot per semi-join nest is needed (if materialized)
   const uint sj_nests= select_lex->sj_nests.elements;
   const uint table_count= select_lex->leaf_table_count;
+  
 
   assert(primary_tables == 0 && tables == 0);
+
+  if (!(primary_tables == 0 && tables == 0)) return true; //tmp fix crash
 
   if (!(join_tab= alloc_jtab_array(thd, table_count)))
     return true;
@@ -9997,7 +10031,8 @@ ORDER *JOIN::remove_const(ORDER *first_order, Item *cond, bool change_list,
 
 bool optimize_cond(THD *thd, Item **cond, COND_EQUAL **cond_equal,
                    List<TABLE_LIST> *join_list,
-                   Item::cond_result *cond_value)
+                   Item::cond_result *cond_value, 
+                   unsigned char part)//TIANMU UPGRADE
 {
   Opt_trace_context * const trace= &thd->opt_trace;
   DBUG_ENTER("optimize_cond");
@@ -10025,24 +10060,30 @@ bool optimize_cond(THD *thd, Item **cond, COND_EQUAL **cond_equal,
     This is performed for the WHERE condition and any join conditions, but
     not for the HAVING condition.
   */
-  if (join_list)
+  if (part == 0 || part == 1)
   {
-    Opt_trace_object step_wrapper(trace);
-    step_wrapper.add_alnum("transformation", "equality_propagation");
-    {
-      Opt_trace_disable_I_S
-        disable_trace_wrapper(trace, !(*cond && (*cond)->has_subquery()));
-      Opt_trace_array
-        trace_subselect(trace, "subselect_evaluation");
-      if (build_equal_items(thd, *cond, cond, NULL, true,
-                            join_list, cond_equal))
-        DBUG_RETURN(true);
+    if (join_list) 
+	{
+      Opt_trace_object step_wrapper(trace);
+      step_wrapper.add_alnum("transformation", "equality_propagation");
+      {
+        Opt_trace_disable_I_S disable_trace_wrapper(
+            trace, !(*cond && (*cond)->has_subquery()));
+        Opt_trace_array trace_subselect(trace, "subselect_evaluation");
+        if (build_equal_items(thd, *cond, cond, NULL, true, join_list,
+                              cond_equal))
+          DBUG_RETURN(true);
+      }
+      step_wrapper.add("resulting_condition", *cond);
     }
-    step_wrapper.add("resulting_condition", *cond);
+  
   }
   /* change field = field to field = const for each found field = const */
   if (*cond)
   {
+   //
+   if (part==0 || part==1)
+   {  
     Opt_trace_object step_wrapper(trace);
     step_wrapper.add_alnum("transformation", "constant_propagation");
     {
@@ -10053,13 +10094,15 @@ bool optimize_cond(THD *thd, Item **cond, COND_EQUAL **cond_equal,
         DBUG_RETURN(true);
     }
     step_wrapper.add("resulting_condition", *cond);
-  }
+  
 
   /*
     Remove all instances of item == item
     Remove all and-levels where CONST item != CONST item
   */
   DBUG_EXECUTE("where",print_where(*cond,"after const change", QT_ORDINARY););
+   }
+  }//ATOMRESTORE UPGRADE
   if (*cond)
   {
     Opt_trace_object step_wrapper(trace);
@@ -10068,7 +10111,7 @@ bool optimize_cond(THD *thd, Item **cond, COND_EQUAL **cond_equal,
       Opt_trace_disable_I_S
         disable_trace_wrapper(trace, !(*cond)->has_subquery());
       Opt_trace_array trace_subselect(trace, "subselect_evaluation");
-      if (remove_eq_conds(thd, *cond, cond, cond_value))
+      if (remove_eq_conds(thd, *cond, cond, cond_value, part))
         DBUG_RETURN(true);
     }
     step_wrapper.add("resulting_condition", *cond);
@@ -10095,7 +10138,8 @@ bool optimize_cond(THD *thd, Item **cond, COND_EQUAL **cond_equal,
 
 static bool internal_remove_eq_conds(THD *thd, Item *cond,
                                      Item **retcond,
-                                     Item::cond_result *cond_value)
+                                     Item::cond_result *cond_value,
+                                     unsigned char part)
 {
   if (cond->type() == Item::COND_ITEM)
   {
@@ -10110,7 +10154,7 @@ static bool internal_remove_eq_conds(THD *thd, Item *cond,
     {
       Item *new_item;
       Item::cond_result tmp_cond_value;
-      if (internal_remove_eq_conds(thd, item, &new_item, &tmp_cond_value))
+      if (internal_remove_eq_conds(thd, item, &new_item, &tmp_cond_value, part))
         return true;
 
       if (new_item == NULL)
@@ -10242,11 +10286,14 @@ static bool internal_remove_eq_conds(THD *thd, Item *cond,
     }
     if (cond->const_item())
     {
+      if (part!=1 || cond->type()!=Item::SUBSELECT_ITEM)
+      {//TIANMU UPGRADE
       bool value;
       if (eval_const_cond(thd, cond, &value))
         return true;
       *cond_value= value ? Item::COND_TRUE : Item::COND_FALSE;
       *retcond= NULL;
+      }//END
       return false;
     }
   }
@@ -10302,7 +10349,7 @@ static bool internal_remove_eq_conds(THD *thd, Item *cond,
 */
 
 bool remove_eq_conds(THD *thd, Item *cond, Item **retcond,
-                     Item::cond_result *cond_value)
+                     Item::cond_result *cond_value, unsigned char part)//TIANMU UPGRADE
 {
   if (cond->type() == Item::FUNC_ITEM &&
       down_cast<Item_func *>(cond)->functype() == Item_func::ISNULL_FUNC)
@@ -10353,7 +10400,7 @@ bool remove_eq_conds(THD *thd, Item *cond, Item **retcond,
       }
     }
   }
-  return internal_remove_eq_conds(thd, cond, retcond, cond_value);
+  return internal_remove_eq_conds(thd, cond, retcond, cond_value, part);//TIANMU UPGRADE
 }
 
 

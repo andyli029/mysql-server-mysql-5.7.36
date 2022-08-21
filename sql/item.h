@@ -2923,7 +2923,10 @@ public:
   table_map used_tables() const;
   enum Item_result result_type () const
   {
-    return field->result_type();
+    if(field)
+		return field->result_type();
+	else
+		return REAL_RESULT;
   }
   enum Item_result numeric_context_result_type() const
   {

@@ -285,8 +285,22 @@ bool init_read_record(READ_RECORD *info,THD *thd,
   }
   else if (info->quick)
   {
-    DBUG_PRINT("info",("using rr_quick"));
-    info->read_record=rr_quick;
+#ifdef TIANMU
+	  //pk processed by engine for tianmu    
+	  if (table->s->db_type()->db_type == DB_TYPE_TIANMU) {
+		  info->read_record = rr_sequential;
+		  if ((error = table->file->ha_rnd_init(1)))
+			  goto err;
+	  }
+	  else {
+		  DBUG_PRINT("info", ("using rr_quick"));
+		  info->read_record = rr_quick;
+	  }
+#else
+	  DBUG_PRINT("info", ("using rr_quick"));
+	  info->read_record = rr_quick;
+#endif
+
   }
   // See save_index() which stores the filesort result set.
   else if (table->sort.has_filesort_result_in_memory())

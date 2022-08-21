@@ -835,6 +835,11 @@ sec_since_epoch(int year, int mon, int mday, int hour, int min ,int sec)
   return ((days * HOURS_PER_DAY + hour) * MINS_PER_HOUR + min) *
          SECS_PER_MIN + sec;
 }
+// FIXME: for tianmu
+my_time_t tianmu_sec_since_epoch(int year, int mon, int mday, int hour, int min ,int sec)
+{
+	return sec_since_epoch(year, mon, mday, hour, min ,sec);
+}
 
 /*
   Converts local time in broken down MYSQL_TIME representation to my_time_t

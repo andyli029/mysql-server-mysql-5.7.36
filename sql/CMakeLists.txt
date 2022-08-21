@@ -38,6 +38,7 @@ SET(CONF_SOURCES
 SET(GEN_SOURCES
   ${CMAKE_CURRENT_BINARY_DIR}/sql_yacc.h 
   ${CMAKE_CURRENT_BINARY_DIR}/sql_yacc.cc
+  ${CMAKE_CURRENT_BINARY_DIR}/mysql_version.cc
   ${CMAKE_CURRENT_BINARY_DIR}/sql_hints.yy.h 
   ${CMAKE_CURRENT_BINARY_DIR}/sql_hints.yy.cc
   ${CMAKE_CURRENT_BINARY_DIR}/lex_hash.h 

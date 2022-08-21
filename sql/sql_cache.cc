@@ -346,8 +346,12 @@ TODO list:
 #include <m_ctype.h>
 #include <my_dir.h>
 #include <hash.h>
+//TIANMU UPGRADE BEGIN
+//#ifdef WITH_MYISAMMRG_STORAGE_ENGINE
 #include "../storage/myisammrg/ha_myisammrg.h"
 #include "../storage/myisammrg/myrg_def.h"
+//#endif
+//END
 #include "probes_mysql.h"
 #include "transaction.h"
 

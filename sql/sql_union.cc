@@ -475,7 +475,7 @@ bool st_select_lex_unit::prepare(THD *thd_arg, Query_result *sel_result,
   set_query_result(sel_result);
 
   thd_arg->lex->set_current_select(first_select());
-
+  found_rows_for_union= first_select()->active_options() & OPTION_FOUND_ROWS;
   // Save fake_select_lex in case we don't need it for anything but
   // global parameters.
   if (saved_fake_select_lex == NULL && // Don't overwrite on PS second prepare
@@ -717,10 +717,11 @@ bool st_select_lex_unit::optimize(THD *thd)
       2. If GROUP BY clause is optimized away because it was a constant then
          query produces at most one row.
     */
+    //1->2 count,sum function set not const for Accurate calculation in storage   <fix:join core>
     if (query_result())
       query_result()->estimated_rowcount+=
         sl->is_implicitly_grouped() || sl->join->group_optimized_away ?
-          1 :  sl->join->best_rowcount;
+          2 :  sl->join->best_rowcount; //TIANMU UPGRADE
 
   }
   if (fake_select_lex)

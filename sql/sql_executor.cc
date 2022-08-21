@@ -44,7 +44,7 @@
 #include "sql_show.h"         // get_schema_tables_result
 #include "sql_tmp_table.h"    // create_tmp_table
 #include "json_dom.h"    // Json_wrapper
-
+#include "handler.h"
 #include <algorithm>
 using std::max;
 using std::min;
@@ -2799,57 +2799,59 @@ void QEP_TAB::pick_table_access_method(const JOIN_TAB *join_tab)
   assert(!join_tab->reversed_access || type() == JT_REF ||
          type() == JT_INDEX_SCAN);
   // Fall through to set default access functions:
-  switch (type())
-  {
-  case JT_REF:
-    if (join_tab->reversed_access)
-    {
-      read_first_record= join_read_last_key;
-      read_record.read_record= join_read_prev_same;
+
+	switch (type())
+	{
+	case JT_REF:
+		if (join_tab->reversed_access)
+		{
+			read_first_record = join_read_last_key;
+			read_record.read_record = join_read_prev_same;
+		}
+		else
+		{
+			read_first_record = join_read_always_key;
+			read_record.read_record = join_read_next_same;
+		}
+		break;
+
+	case JT_REF_OR_NULL:
+		read_first_record = join_read_always_key_or_null;
+		read_record.read_record = join_read_next_same_or_null;
+		break;
+
+	case JT_CONST:
+		read_first_record = join_read_const;
+		read_record.read_record = join_no_more_records;
+		read_record.unlock_row = join_const_unlock_row;
+		break;
+
+	case JT_EQ_REF:
+		read_first_record = join_read_key;
+		read_record.read_record = join_no_more_records;
+		read_record.unlock_row = join_read_key_unlock_row;
+		break;
+
+	case JT_FT:
+		read_first_record = join_ft_read_first;
+		read_record.read_record = join_ft_read_next;
+		break;
+
+	case JT_INDEX_SCAN:
+		read_first_record = join_tab->reversed_access ?
+			join_read_last : join_read_first;
+		break;
+	case JT_ALL:
+	case JT_RANGE:
+	case JT_INDEX_MERGE:
+		read_first_record = (join_tab->use_quick == QS_DYNAMIC_RANGE) ?
+			join_init_quick_read_record : join_init_read_record;
+		break;
+	default:
+		assert(0);
+		break;
     }
-    else
-    {
-      read_first_record= join_read_always_key;
-      read_record.read_record= join_read_next_same;
-    }
-    break;
 
-  case JT_REF_OR_NULL:
-    read_first_record= join_read_always_key_or_null;
-    read_record.read_record= join_read_next_same_or_null;
-    break;
-
-  case JT_CONST:
-    read_first_record= join_read_const;
-    read_record.read_record= join_no_more_records;
-    read_record.unlock_row= join_const_unlock_row;
-    break;
-
-  case JT_EQ_REF:
-    read_first_record= join_read_key;
-    read_record.read_record= join_no_more_records;
-    read_record.unlock_row= join_read_key_unlock_row;
-    break;
-
-  case JT_FT:
-    read_first_record= join_ft_read_first;
-    read_record.read_record= join_ft_read_next;
-    break;
-
-  case JT_INDEX_SCAN:
-    read_first_record= join_tab->reversed_access ?
-      join_read_last : join_read_first;
-    break;
-  case JT_ALL:
-  case JT_RANGE:
-  case JT_INDEX_MERGE:
-    read_first_record= (join_tab->use_quick == QS_DYNAMIC_RANGE) ?
-      join_init_quick_read_record : join_init_read_record;
-    break;
-  default:
-    assert(0);
-    break;
-  }
 }
 
 

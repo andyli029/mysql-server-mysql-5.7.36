@@ -776,6 +776,7 @@ int ha_finalize_handlerton(st_plugin_int *plugin)
   if (!hton)
     goto end;
 
+#if !defined(TIANMU)
   switch (hton->state)
   {
   case SHOW_OPTION_NO:
@@ -786,6 +787,7 @@ int ha_finalize_handlerton(st_plugin_int *plugin)
       installed_htons[hton->db_type]= NULL;
     break;
   };
+#endif
 
   if (hton->panic)
     hton->panic(hton, HA_PANIC_CLOSE);
@@ -803,6 +805,19 @@ int ha_finalize_handlerton(st_plugin_int *plugin)
                              plugin->name.str));
     }
   }
+
+#if defined(TIANMU)
+  switch (hton->state)
+  {
+  case SHOW_OPTION_NO:
+  case SHOW_OPTION_DISABLED:
+	  break;
+  case SHOW_OPTION_YES:
+	  if (installed_htons[hton->db_type] == hton)
+		  installed_htons[hton->db_type] = NULL;
+	  break;
+  };
+#endif
 
   /*
     In case a plugin is uninstalled and re-installed later, it should

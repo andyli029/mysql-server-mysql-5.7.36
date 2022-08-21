@@ -1251,7 +1251,9 @@ THD::THD(bool enable_plugins)
 
   timer= NULL;
   timer_cache= NULL;
-
+  //TIANMU UPGRADE BEGIN
+  //rplContextPtr = NULL;
+  //END
   m_token_array= NULL;
   if (max_digest_length > 0)
   {
@@ -3886,6 +3888,14 @@ extern "C" size_t thd_query_safe(MYSQL_THD thd, char *buf, size_t buflen)
   return len;
 }
 
+extern "C"  LEX_STRING * thd_query_string (MYSQL_THD thd)
+{
+  LEX_STRING *lexs;
+  lexs->str = const_cast<char *>(thd->query().str);
+  lexs->length = thd->query().length;
+  return(lexs);
+}
+
 extern "C" int thd_slave_thread(const MYSQL_THD thd)
 {
   return(thd->slave_thread);
@@ -4785,6 +4795,9 @@ void THD::send_statement_status()
     case Diagnostics_area::DA_DISABLED:
       break;
     case Diagnostics_area::DA_EMPTY:
+		error = m_protocol->send_error(
+			2233, "Be disgraceful to storage engine, operating is forbidden!", "HY000");//BUG:DDL crash
+		break;
     default:
       assert(0);
           error= m_protocol->send_ok(server_status, 0, 0, 0, NULL);

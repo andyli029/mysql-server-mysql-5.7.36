@@ -96,7 +96,7 @@ public:
   int set_cmp_func(Item_result_field *owner_arg,
                    Item **a1, Item **a2, bool set_null_arg);
 
-  inline int compare() { return (this->*func)(); }
+  inline int compare() { if(this->func) return (this->*func)();else return 0; }
 
   int compare_string();		 // compare args[0] & args[1]
   int compare_binary_string();	 // compare args[0] & args[1]

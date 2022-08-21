@@ -70,7 +70,7 @@ public:
 
   Element_type &operator[](size_t n)
   {
-    assert(n < m_size);
+    //assert(n < m_size);
     return m_array[n];
   }
 

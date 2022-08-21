@@ -4156,6 +4156,20 @@ protected:
   virtual ~Create_func_year_week() {}
 };
 
+#ifdef TIANMU
+class Create_func_multivalue_find : public Create_func_arg3
+{
+public:
+  virtual Item *create(THD *thd, Item *arg1, Item *arg2, Item *arg3);
+
+  static Create_func_multivalue_find s_singleton;
+
+protected:
+  Create_func_multivalue_find() {}
+  virtual ~Create_func_multivalue_find() {}
+};
+#endif
+
 
 /*
 =============================================================================
@@ -4821,6 +4835,15 @@ Create_func_degrees::create(THD *thd, Item *arg1)
                                              180/M_PI, 0.0);
 }
 
+#ifdef TIANMU
+Create_func_multivalue_find Create_func_multivalue_find::s_singleton;
+
+Item*
+Create_func_multivalue_find::create(THD *thd, Item *arg1, Item *arg2, Item *arg3)
+{
+  return new (thd->mem_root) Item_func_multivalue_find(arg1, arg2, arg3);
+}
+#endif
 
 Create_func_des_decrypt Create_func_des_decrypt::s_singleton;
 
@@ -7829,7 +7852,9 @@ static Native_func_registry func_array[] =
   { { C_STRING_WITH_LEN("X") }, GEOM_BUILDER(Create_func_x_deprecated)},
   { { C_STRING_WITH_LEN("Y") }, GEOM_BUILDER(Create_func_y_deprecated)},
   { { C_STRING_WITH_LEN("YEARWEEK") }, BUILDER(Create_func_year_week)},
-
+  #ifdef TIANMU
+  { { C_STRING_WITH_LEN("MULTIVALUE_FIND") }, BUILDER(Create_func_multivalue_find)},
+  #endif
   { {0, 0}, NULL}
 };
 

@@ -101,8 +101,8 @@ uint find_shortest_key(TABLE *table, const key_map *usable_keys);
     without multi-level ORDER BY/LIMIT separately.
     Such queries are executed with a more direct code path.
 */
-bool handle_query(THD *thd, LEX *lex, Query_result *result,
-                  ulonglong added_options, ulonglong removed_options)
+bool handle_query(THD *thd, LEX *lex, Query_result *result, ulonglong added_options, 
+	              ulonglong removed_options, int optimize_after_bh, int free_join_from_bh)
 {
   DBUG_ENTER("handle_query");
 
@@ -143,9 +143,13 @@ bool handle_query(THD *thd, LEX *lex, Query_result *result,
   }
   else
   {
-    if (unit->prepare(thd, result, SELECT_NO_UNLOCK | added_options,
-                      removed_options))
-      goto err;
+	res = FALSE;
+	if (optimize_after_bh)
+		res = lex->unit->optimize_after_tianmu();   // optimization after Tianmu
+	if (!res)
+		if (unit->prepare(thd, result, SELECT_NO_UNLOCK | added_options,
+						  removed_options))
+		  goto err;
   }
 
   assert(!lex->is_query_tables_locked());
